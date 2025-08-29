@@ -18,6 +18,13 @@ Este proyecto es una configuración de Ansible para implementar y gestionar la a
 
 - **roles/itop/handlers/main.yml**: Define los handlers que se pueden utilizar en el rol "itop". Los handlers son tareas que se ejecutan cuando son notificados por otras tareas.
 
+### Requisitos
+```
+sudo apt install -y pipx git ansible-core
+pipx install --include-deps ansible
+sudo apt install ansible-core
+```
+
 ## Instrucciones de Uso
 
 1. **Configuración del Inventario**: Modifique el archivo `inventory.ini` para definir sus hosts y grupos.
