@@ -41,3 +41,26 @@ sudo apt install ansible-core
 5. **Handlers**: Asegúrese de que los handlers en `roles/itop/handlers/main.yml` estén configurados para notificar las tareas adecuadas.
 
 Este proyecto proporciona una base sólida para implementar y gestionar iTop utilizando Ansible.
+
+## Fast ssh configuration for testing
+```
+# Instalar el servidor SSH
+apt-get update && apt-get install -y openssh-server
+
+# Habilitar y arrancar el servicio SSH
+systemctl enable --now ssh
+
+# Hacer un backup del archivo de configuración antes de modificarlo
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+
+# Descomentar y habilitar la autenticación por contraseña
+sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# En caso de que la línea no exista, añadirla explícitamente
+grep -q '^PasswordAuthentication' /etc/ssh/sshd_config || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+
+# Reiniciar el servicio para aplicar los cambios
+systemctl restart ssh
+hostname -I
+```
+
