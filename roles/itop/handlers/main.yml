@@ -1,0 +1,12 @@
+- name: Restart Apache
+  service:
+    name: apache2
+    state: restarted
+
+- name: Restart PHP-FPM
+  service:
+    name: "php{{ php_version }}-fpm"
+    state: restarted
+
+- name: Fix permissions
+  command: chown -R www-data:www-data {{ itop_web_root }}

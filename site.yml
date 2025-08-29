@@ -1,0 +1,8 @@
+- name: Instalar iTop en localhost
+  hosts: localhost
+  connection: local
+  become: true
+  vars_files:
+    - group_vars/itop.yml
+  roles:
+    - itop
