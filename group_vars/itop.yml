@@ -7,8 +7,8 @@ itop_web_root: /var/www/itop
 # Versión/descarga de iTop
 # Recomendado: fijar versión estable publicada por Combodo.
 # Puedes mirar versiones aquí: https://github.com/Combodo/iTop/releases
-itop_version: "3.2.1-1"
-itop_download_url: "https://github.com/Combodo/iTop/releases/download/{{ itop_version }}/iTop-{{ itop_version }}-23836.zip"
+itop_version: "3.1.1-1"
+itop_download_url: "https://sourceforge.net/projects/itop/files/itop/3.1.1-1/iTop-3.1.1-1-12561.zip"
 
 # DB (MariaDB)
 itop_db_name: itop

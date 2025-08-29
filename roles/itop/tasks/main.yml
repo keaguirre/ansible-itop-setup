@@ -3,6 +3,23 @@
     update_cache: yes
     cache_valid_time: 3600
 
+- name: Paquetes base para manejar PPAs
+  apt:
+    name: [software-properties-common, ca-certificates]
+    state: present
+  when: ansible_distribution_release in ['noble','mantic'] # Ubuntu 24.04+
+
+- name: add PPA de Ondrej para PHP
+  command: add-apt-repository -y ppa:ondrej/php
+  args:
+    creates: /etc/apt/sources.list.d/ondrej-ubuntu-php*
+  when: ansible_distribution_release in ['noble','mantic']
+
+- name: apt update
+  apt:
+    update_cache: yes
+  when: ansible_distribution_release in ['noble','mantic']
+
 - name: Instalar Apache, PHP-FPM {{ php_version }}, MariaDB y utilidades
   apt:
     name:
@@ -15,7 +32,6 @@
       - php{{ php_version }}-fpm
       - php{{ php_version }}-mysql
       - php{{ php_version }}-cli
-      - php{{ php_version }}-json
       - php{{ php_version }}-xml
       - php{{ php_version }}-gd
       - php{{ php_version }}-zip
@@ -30,7 +46,8 @@
 
 - name: Habilitar módulos de Apache necesarios
   command: a2enmod "{{ item }}"
-  args: { warn: false }
+  args:
+    creates: "/etc/apache2/mods-enabled/{{ item }}.load"
   loop:
     - proxy
     - proxy_fcgi
@@ -47,7 +64,7 @@
     mode: "0644"
   notify: Restart PHP-FPM
 
-- name: Asegurar directorio web
+- name: Asegurar directorio base de iTop
   file:
     path: "{{ itop_web_root }}"
     state: directory
@@ -60,6 +77,9 @@
     url: "{{ itop_download_url }}"
     dest: /tmp/itop.zip
     mode: "0644"
+    timeout: 120
+    headers:
+      User-Agent: ansible-itop-installer
 
 - name: Descomprimir iTop en webroot
   unarchive:
@@ -69,22 +89,40 @@
     extra_opts: [ "-q" ]
   notify: Fix permissions
 
-- name: Crear base de datos y usuario (MariaDB)
+- name: Instalar dependencias de Python para MySQL (Debian/Ubuntu)
+  become: true
+  apt:
+    name: python3-pymysql
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Instalar dependencias de Python para MySQL (RedHat/Fedora)
+  become: true
+  dnf:
+    name: python3-PyMySQL
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Crear base de datos (MariaDB)
+  become: true
   community.mysql.mysql_db:
     name: "{{ itop_db_name }}"
     state: present
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
+    login_unix_socket: /var/run/mysqld/mysqld.sock
 
-- name: Crear usuario de BD y permisos
+- name: Crear usuario de BD y permisos (MariaDB)
+  become: true
   community.mysql.mysql_user:
     name: "{{ itop_db_user }}"
     password: "{{ itop_db_password }}"
-    host: "{{ itop_db_host }}"
+    host: "localhost"
     priv: "{{ itop_db_name }}.*:ALL"
     state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
 
 # VirtualHost Apache que pasa PHP a PHP-FPM
 - name: VirtualHost para iTop
@@ -107,6 +145,7 @@
   notify: Restart Apache
 
 - name: Asegurar permisos y propiedad del árbol de iTop
+  become: true
   file:
     path: "{{ itop_web_root }}"
     state: directory
@@ -124,3 +163,4 @@
     - php{{ php_version }}-fpm
     - apache2
     - mariadb
+
