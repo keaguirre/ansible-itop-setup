@@ -18,6 +18,26 @@ Este proyecto es una configuración de Ansible para implementar y gestionar la a
 
 - **roles/itop/handlers/main.yml**: Define los handlers que se pueden utilizar en el rol "itop". Los handlers son tareas que se ejecutan cuando son notificados por otras tareas.
 
+### Estructura del proyecto en formato árbol
+
+```
+.
+├── README.md
+├── group_vars
+│   └── itop.yml
+├── inventory.ini
+├── roles
+│   └── itop
+│       ├── handlers
+│       │   └── main.yml
+│       ├── tasks
+│       │   └── main.yml
+│       └── templates
+│           ├── itop-apache-vhost.conf.j2
+│           └── php.ini.d-itop.ini.j2
+└── site.yml
+```
+
 ### Requisitos
 ```
 sudo apt install -y pipx git ansible-core
