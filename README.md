@@ -42,7 +42,7 @@ Este proyecto es una configuración de Ansible para implementar y gestionar la a
 ```
 sudo apt install -y pipx git ansible-core
 pipx install --include-deps ansible
-sudo apt install ansible-core
+pipx ensurepath
 ```
 
 ## Instrucciones de Uso
