@@ -52,9 +52,14 @@ pipx ensurepath
 2. **Definición de Variables**: Ajuste las variables en `group_vars/itop.yml` según sea necesario para su entorno.
 
 3. **Ejecución del Playbook**: Ejecute el playbook principal con el siguiente comando:
-   ```
+   ```bash
    ansible-playbook -i inventory.ini site.yml
    ```
+   o
+   ```bash
+   sudo ansible-pull -U https://github.com/keaguirre/ansible-test-itop.git -d /etc/ansible-itop -i inventory.ini site.yml
+   ```
+   
 
 4. **Personalización de Plantillas**: Modifique las plantillas en `roles/itop/templates/` según sus necesidades.
 
