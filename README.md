@@ -59,7 +59,7 @@ pipx ensurepath
    ```bash
    sudo ansible-pull \
      -U https://github.com/keaguirre/ansible-test-itop.git \
-     -C uncouple-db \
+     -C main \
      -d /etc/ansible-itop \
      -i /etc/ansible-itop/inventory.ini \
      /etc/ansible-itop/site.yml
@@ -95,3 +95,9 @@ systemctl restart ssh
 hostname -I
 ```
 
+# To connect external mysql db from railway
+## El texto posterior a @ es el host y puerto
+```bash
+switchback.proxy.rlwy.net:45665
+```
+## Luego el user root y la password que te den
