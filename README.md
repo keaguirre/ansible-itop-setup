@@ -59,7 +59,7 @@ pipx ensurepath
    ```bash
    sudo ansible-pull \
      -U https://github.com/keaguirre/ansible-test-itop.git \
-     -C unacouple-db \
+     -C uncouple-db \
      -d /etc/ansible-itop \
      -i /etc/ansible-itop/inventory.ini \
      /etc/ansible-itop/site.yml
