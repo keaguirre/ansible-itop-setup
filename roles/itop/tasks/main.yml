@@ -1,31 +1,62 @@
+---
+# ============================================
+# ESPERAR QUE EL SISTEMA ESTE LISTO
+# ============================================
+
+- name: Esperar que dpkg/apt estén disponibles
+  shell: |
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ; do
+      echo "Esperando que dpkg esté disponible..."
+      sleep 2
+    done
+  changed_when: false
+  tags: ['install']
+
+# ============================================
+# ACTUALIZACION DEL SISTEMA
+# ============================================
+
 - name: Actualizar cache APT
   apt:
     update_cache: yes
     cache_valid_time: 3600
+  retries: 3
+  delay: 10
+  register: apt_update
+  until: apt_update is succeeded
+  tags: ['install', 'update']
+
+# ============================================
+# INSTALACION DE APACHE Y PHP
+# ============================================
 
 - name: Paquetes base para manejar PPAs
   apt:
-    name: [software-properties-common, ca-certificates]
+    name: 
+      - software-properties-common
+      - ca-certificates
     state: present
-  when: ansible_distribution_release in ['noble','mantic'] # Ubuntu 24.04+
+  when: ansible_distribution_release in ['noble','mantic']
+  tags: ['install']
 
 - name: add PPA de Ondrej para PHP
   command: add-apt-repository -y ppa:ondrej/php
   args:
     creates: /etc/apt/sources.list.d/ondrej-ubuntu-php*
   when: ansible_distribution_release in ['noble','mantic']
+  tags: ['install']
 
 - name: apt update
   apt:
     update_cache: yes
   when: ansible_distribution_release in ['noble','mantic']
+  tags: ['install']
 
-- name: Instalar Apache, PHP-FPM {{ php_version }}, MariaDB y utilidades
+- name: Instalar Apache, PHP-FPM {{ php_version }}, y utilidades
   apt:
     name:
       - apache2
       - libapache2-mod-fcgid
-      - mariadb-server
       - unzip
       - curl
       - graphviz
@@ -43,6 +74,7 @@
       - php{{ php_version }}-imap
       - php{{ php_version }}-intl
     state: present
+  tags: ['install']
 
 - name: Habilitar módulos de Apache necesarios
   command: a2enmod "{{ item }}"
@@ -56,6 +88,11 @@
     - expires
     - rewrite
   notify: Restart Apache
+  tags: ['config']
+
+# ============================================
+# CONFIGURACION DE PHP
+# ============================================
 
 - name: Ajustes PHP específicos para iTop
   template:
@@ -63,6 +100,17 @@
     dest: /etc/php/{{ php_version }}/fpm/conf.d/99-itop.ini
     mode: "0644"
   notify: Restart PHP-FPM
+  tags: ['config']
+
+# ============================================
+# VERIFICACION Y PREPARACION DE DIRECTORIOS
+# ============================================
+
+- name: Verificar que el directorio de instalación existe (EFS debe estar montado)
+  stat:
+    path: "{{ itop_web_root }}"
+  register: install_dir
+  tags: ['install']
 
 - name: Asegurar directorio base de iTop
   file:
@@ -71,6 +119,18 @@
     owner: www-data
     group: www-data
     mode: "0755"
+  when: install_dir.stat.exists
+  tags: ['install']
+
+- name: Verificar si iTop ya está instalado
+  stat:
+    path: "{{ itop_web_root }}/web/index.php"
+  register: itop_installed
+  tags: ['install']
+
+# ============================================
+# DESCARGA E INSTALACION DE ITOP
+# ============================================
 
 - name: Descargar iTop {{ itop_version }}
   get_url:
@@ -80,6 +140,8 @@
     timeout: 120
     headers:
       User-Agent: ansible-itop-installer
+  when: not itop_installed.stat.exists
+  tags: ['install']
 
 - name: Descomprimir iTop en webroot
   unarchive:
@@ -87,55 +149,36 @@
     dest: "{{ itop_web_root }}"
     remote_src: yes
     extra_opts: [ "-q" ]
+    owner: www-data
+    group: www-data
+  when: not itop_installed.stat.exists
   notify: Fix permissions
+  tags: ['install']
 
-- name: Instalar dependencias de Python para MySQL (Debian/Ubuntu)
-  become: true
-  apt:
-    name: python3-pymysql
-    state: present
-    update_cache: yes
-  when: ansible_os_family == "Debian"
+- name: Limpiar archivo zip temporal
+  file:
+    path: /tmp/itop.zip
+    state: absent
+  when: not itop_installed.stat.exists
+  tags: ['install']
 
-- name: Instalar dependencias de Python para MySQL (RedHat/Fedora)
-  become: true
-  dnf:
-    name: python3-PyMySQL
-    state: present
-    update_cache: yes
-  when: ansible_os_family == "RedHat"
+# ============================================
+# CONFIGURACION DE APACHE
+# ============================================
 
-# - name: Crear base de datos (MariaDB)
-#   become: true
-#   community.mysql.mysql_db:
-#     name: "{{ itop_db_name }}"
-#     state: present
-#     encoding: utf8mb4
-#     collation: utf8mb4_unicode_ci
-#     login_unix_socket: /var/run/mysqld/mysqld.sock
-
-# - name: Crear usuario de BD y permisos (MariaDB)
-#   become: true
-#   community.mysql.mysql_user:
-#     name: "{{ itop_db_user }}"
-#     password: "{{ itop_db_password }}"
-#     host: "localhost"
-#     priv: "{{ itop_db_name }}.*:ALL"
-#     state: present
-#     login_unix_socket: /var/run/mysqld/mysqld.sock
-
-# VirtualHost Apache que pasa PHP a PHP-FPM
 - name: VirtualHost para iTop
   template:
     src: itop-apache-vhost.conf.j2
     dest: /etc/apache2/sites-available/itop.conf
   notify: Restart Apache
+  tags: ['config']
 
 - name: Deshabilitar sitio por defecto
   file:
     path: /etc/apache2/sites-enabled/000-default.conf
     state: absent
   notify: Restart Apache
+  tags: ['config']
 
 - name: Habilitar sitio iTop
   file:
@@ -143,9 +186,13 @@
     dest: /etc/apache2/sites-enabled/itop.conf
     state: link
   notify: Restart Apache
+  tags: ['config']
+
+# ============================================
+# PERMISOS Y PROPIEDAD
+# ============================================
 
 - name: Asegurar permisos y propiedad del árbol de iTop
-  become: true
   file:
     path: "{{ itop_web_root }}"
     state: directory
@@ -153,6 +200,27 @@
     owner: www-data
     group: www-data
     mode: "0755"
+  notify: Fix permissions
+  tags: ['config', 'permissions']
+
+- name: Crear directorios de datos con permisos especiales
+  file:
+    path: "{{ itop_web_root }}/{{ item }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0770'
+  loop:
+    - data
+    - log
+    - env-production
+    - conf
+  ignore_errors: yes
+  tags: ['config', 'permissions']
+
+# ============================================
+# INICIAR SERVICIOS
+# ============================================
 
 - name: Iniciar y habilitar servicios
   service:
@@ -162,5 +230,21 @@
   loop:
     - php{{ php_version }}-fpm
     - apache2
-    - mariadb
+  tags: ['service']
 
+# ============================================
+# INFORMACION FINAL
+# ============================================
+
+- name: Mostrar información de acceso
+  debug:
+    msg:
+      - "================================================"
+      - "iTop desplegado correctamente"
+      - "================================================"
+      - "URL de setup: http://{{ ansible_default_ipv4.address }}/setup/"
+      - "Directorio: {{ itop_web_root }}"
+      - ""
+      - "CONFIGURACIÓN MANUAL REQUERIDA:"
+      - "1. Accede al setup web"
+      - "2. Ingresa los
