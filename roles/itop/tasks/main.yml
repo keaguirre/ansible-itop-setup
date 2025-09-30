@@ -1,18 +1,5 @@
 ---
 # ============================================
-# ESPERAR QUE EL SISTEMA ESTE LISTO
-# ============================================
-
-- name: Esperar que dpkg/apt estén disponibles
-  shell: |
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ; do
-      echo "Esperando que dpkg esté disponible..."
-      sleep 2
-    done
-  changed_when: false
-  tags: ['install']
-
-# ============================================
 # ACTUALIZACION DEL SISTEMA
 # ============================================
 
@@ -20,8 +7,8 @@
   apt:
     update_cache: yes
     cache_valid_time: 3600
-  retries: 3
-  delay: 10
+  retries: 5
+  delay: 15
   register: apt_update
   until: apt_update is succeeded
   tags: ['install', 'update']
@@ -106,7 +93,7 @@
 # VERIFICACION Y PREPARACION DE DIRECTORIOS
 # ============================================
 
-- name: Verificar que el directorio de instalación existe (EFS debe estar montado)
+- name: Verificar que el directorio de instalación existe
   stat:
     path: "{{ itop_web_root }}"
   register: install_dir
@@ -119,7 +106,6 @@
     owner: www-data
     group: www-data
     mode: "0755"
-  when: install_dir.stat.exists
   tags: ['install']
 
 - name: Verificar si iTop ya está instalado
@@ -148,7 +134,7 @@
     src: /tmp/itop.zip
     dest: "{{ itop_web_root }}"
     remote_src: yes
-    extra_opts: [ "-q" ]
+    extra_opts: ["-q"]
     owner: www-data
     group: www-data
   when: not itop_installed.stat.exists
@@ -209,7 +195,7 @@
     state: directory
     owner: www-data
     group: www-data
-    mode: '0770'
+    mode: "0770"
   loop:
     - data
     - log
@@ -245,9 +231,9 @@
       - "URL de setup: http://{{ ansible_default_ipv4.address }}/setup/"
       - "Directorio: {{ itop_web_root }}"
       - ""
-      - "CONFIGURACIÓN MANUAL REQUERIDA:"
+      - "CONFIGURACION MANUAL REQUERIDA:"
       - "1. Accede al setup web"
-      - "2. Ingresa los datos de conexión a RDS manualmente"
-      - "3. Completa la configuración de iTop"
+      - "2. Ingresa los datos de conexion a RDS manualmente"
+      - "3. Completa la configuracion de iTop"
       - "================================================"
   tags: ['info']
