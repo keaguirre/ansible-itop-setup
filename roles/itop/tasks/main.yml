@@ -247,4 +247,7 @@
       - ""
       - "CONFIGURACIÓN MANUAL REQUERIDA:"
       - "1. Accede al setup web"
-      - "2. Ingresa los
+      - "2. Ingresa los datos de conexión a RDS manualmente"
+      - "3. Completa la configuración de iTop"
+      - "================================================"
+  tags: ['info']
