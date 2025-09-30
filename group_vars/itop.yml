@@ -11,15 +11,15 @@ itop_version: "3.1.1-1"
 itop_download_url: "https://sourceforge.net/projects/itop/files/itop/3.1.1-1/iTop-3.1.1-1-12561.zip"
 
 # DB (MariaDB)
-itop_db_name: itop
-itop_db_user: itop
-itop_db_password: "CambiaEstaPasswordSegura"
-itop_db_host: "localhost"
+# itop_db_name: itop
+# itop_db_user: itop
+# itop_db_password: "CambiaEstaPasswordSegura"
+# itop_db_host: "localhost"
 
 # PHP / Apache (PHP-FPM 8.1 en Ubuntu 22.04)
 php_version: "8.1"
 php_fpm_pool: "www"
-php_memory_limit: "512M"
+php_memory_limit: "1024"
 php_upload_max_filesize: "32M"
 php_post_max_size: "32M"
 php_max_execution_time: "300"
