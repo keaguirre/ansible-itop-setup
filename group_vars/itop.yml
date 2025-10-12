@@ -21,7 +21,7 @@ php_version: "8.1"
 php_fpm_pool: "www"
 php_memory_limit: "1024"
 php_upload_max_filesize: "32M"
-php_post_max_size: "32M"
+php_post_max_size: "64M"
 php_max_execution_time: "300"
 
 # HTTPS (opcional). Si usas SSL termina el vhost a tu gusto.
