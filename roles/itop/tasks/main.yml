@@ -19,7 +19,7 @@
 
 - name: Paquetes base para manejar PPAs
   apt:
-    name: 
+    name:
       - software-properties-common
       - ca-certificates
     state: present
@@ -93,7 +93,7 @@
 # VERIFICACION Y PREPARACION DE DIRECTORIOS
 # ============================================
 
-- name: Verificar que el directorio de instalación existe
+- name: Verificar directorio base de iTop (itop_web_root)
   stat:
     path: "{{ itop_web_root }}"
   register: install_dir
@@ -108,11 +108,32 @@
     mode: "0755"
   tags: ['install']
 
-- name: Verificar si iTop ya está instalado
+# Señal de "código presente": índice público de iTop
+- name: Verificar si ya existe el árbol web de iTop
   stat:
     path: "{{ itop_web_root }}/web/index.php"
-  register: itop_installed
+  register: itop_web_present
   tags: ['install']
+
+# Señal de "setup completado": existe config-itop.php
+- name: Verificar si iTop ya está configurado (config-itop.php)
+  stat:
+    path: "{{ itop_web_root }}/web/conf/production/config-itop.php"
+  register: itop_configured
+  tags: ['install']
+
+# Crear estructura para que el wizard pueda escribir config-itop.php
+- name: Crear estructura de conf/production con permisos para www-data
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0775"
+  loop:
+    - "{{ itop_web_root }}/web/conf"
+    - "{{ itop_web_root }}/web/conf/production"
+  tags: ['config', 'permissions']
 
 # ============================================
 # DESCARGA E INSTALACION DE ITOP
@@ -126,7 +147,7 @@
     timeout: 120
     headers:
       User-Agent: ansible-itop-installer
-  when: not itop_installed.stat.exists
+  when: not itop_web_present.stat.exists
   tags: ['install']
 
 - name: Descomprimir iTop en webroot
@@ -137,7 +158,7 @@
     extra_opts: ["-q"]
     owner: www-data
     group: www-data
-  when: not itop_installed.stat.exists
+  when: not itop_web_present.stat.exists
   notify: Fix permissions
   tags: ['install']
 
@@ -145,14 +166,14 @@
   file:
     path: /tmp/itop.zip
     state: absent
-  when: not itop_installed.stat.exists
+  when: not itop_web_present.stat.exists
   tags: ['install']
 
 # ============================================
 # CONFIGURACION DE APACHE
 # ============================================
 
-- name: VirtualHost para iTop
+- name: VirtualHost para iTop (DocumentRoot -> {{ itop_web_root }}/web)
   template:
     src: itop-apache-vhost.conf.j2
     dest: /etc/apache2/sites-available/itop.conf
@@ -174,11 +195,22 @@
   notify: Restart Apache
   tags: ['config']
 
+- name: Eliminar index.html que pueden tapar iTop
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/www/html/index.html
+    - "{{ itop_web_root }}/index.html"
+    - "{{ itop_web_root }}/web/index.html"
+  notify: Restart Apache
+  tags: ['config']
+
 # ============================================
 # PERMISOS Y PROPIEDAD
 # ============================================
 
-- name: Asegurar permisos y propiedad del árbol de iTop
+- name: Asegurar propiedad recursiva para www-data
   file:
     path: "{{ itop_web_root }}"
     state: directory
@@ -188,6 +220,14 @@
     mode: "0755"
   notify: Fix permissions
   tags: ['config', 'permissions']
+
+- name: Asegurar permisos recursivos (dirs 755, files 644)
+  shell: |
+    find {{ itop_web_root }} -type d -exec chmod 755 {} +;
+    find {{ itop_web_root }} -type f -exec chmod 644 {} +;
+  args:
+    warn: false
+  tags: ['permissions']
 
 - name: Crear directorios de datos con permisos especiales
   file:
@@ -203,6 +243,17 @@
     - conf
   ignore_errors: yes
   tags: ['config', 'permissions']
+
+# Marker para señales externas (initialize-itop.sh / monitoreo)
+- name: Crear marker de provisión en EFS
+  copy:
+    dest: "{{ itop_web_root }}/.itop_provisioned"
+    content: "provisioned at {{ ansible_date_time.iso8601 }}"
+    owner: www-data
+    group: www-data
+    mode: "0644"
+  when: itop_web_present.stat.exists
+  tags: ['info']
 
 # ============================================
 # INICIAR SERVICIOS
@@ -224,16 +275,26 @@
 
 - name: Mostrar información de acceso
   debug:
-    msg:
-      - "================================================"
-      - "iTop desplegado correctamente"
-      - "================================================"
-      - "URL de setup: http://{{ ansible_default_ipv4.address }}/setup/"
-      - "Directorio: {{ itop_web_root }}"
-      - ""
-      - "CONFIGURACION MANUAL REQUERIDA:"
-      - "1. Accede al setup web"
-      - "2. Ingresa los datos de conexion a RDS manualmente"
-      - "3. Completa la configuracion de iTop"
-      - "================================================"
+    msg: >-
+      {{
+        [
+          "================================================",
+          "iTop desplegado correctamente",
+          "================================================",
+          itop_configured.stat.exists
+            | ternary(
+                "URL: http://" ~ ansible_default_ipv4.address ~ "/",
+                "URL de setup: http://" ~ ansible_default_ipv4.address ~ "/setup/"
+              ),
+          "Directorio: " ~ itop_web_root,
+          "",
+          (itop_configured.stat.exists
+            | ternary(
+                "CONFIGURACION: detectada (config-itop.php presente en web/conf/production)",
+                "CONFIGURACION MANUAL REQUERIDA: 1) Accede al setup web 2) Ingresa credenciales RDS 3) Completa el wizard"
+              )
+          ),
+          "================================================"
+        ]
+      }}
   tags: ['info']
