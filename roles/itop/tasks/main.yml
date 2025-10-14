@@ -176,18 +176,18 @@
   notify: Restart Apache
   tags: ['config']
 
-- name: Deshabilitar sitio por defecto
-  ansible.builtin.file:
-    path: /etc/apache2/sites-enabled/000-default.conf
-    state: absent
+# Habilitar itop.conf y deshabilitar default usando módulos
+- name: Habilitar sitio itop.conf
+  community.general.apache2_site:
+    name: itop.conf
+    state: enabled
   notify: Restart Apache
   tags: ['config']
 
-- name: Habilitar sitio iTop
-  ansible.builtin.file:
-    src: /etc/apache2/sites-available/itop.conf
-    dest: /etc/apache2/sites-enabled/itop.conf
-    state: link
+- name: Deshabilitar sitio por defecto 000-default.conf
+  community.general.apache2_site:
+    name: 000-default.conf
+    state: disabled
   notify: Restart Apache
   tags: ['config']
 
