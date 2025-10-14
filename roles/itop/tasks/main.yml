@@ -176,18 +176,17 @@
   notify: Restart Apache
   tags: ['config']
 
-# Habilitar itop.conf y deshabilitar default usando módulos
 - name: Habilitar sitio itop.conf
-  community.general.apache2_site:
-    name: itop.conf
-    state: enabled
+  ansible.builtin.command: a2ensite itop.conf
+  args:
+    creates: /etc/apache2/sites-enabled/itop.conf
   notify: Restart Apache
   tags: ['config']
 
 - name: Deshabilitar sitio por defecto 000-default.conf
-  community.general.apache2_site:
-    name: 000-default.conf
-    state: disabled
+  ansible.builtin.file:
+    path: /etc/apache2/sites-enabled/000-default.conf
+    state: absent
   notify: Restart Apache
   tags: ['config']
 
@@ -201,6 +200,7 @@
     - "{{ itop_web_root }}/web/index.html"
   notify: Restart Apache
   tags: ['config']
+
 
 # ============================================
 # PERMISOS Y PROPIEDAD (100% módulos)
