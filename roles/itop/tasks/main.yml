@@ -4,7 +4,7 @@
 # ============================================
 
 - name: Actualizar cache APT
-  apt:
+  ansible.builtin.apt:
     update_cache: yes
     cache_valid_time: 3600
   retries: 5
@@ -18,7 +18,7 @@
 # ============================================
 
 - name: Paquetes base para manejar PPAs
-  apt:
+  ansible.builtin.apt:
     name:
       - software-properties-common
       - ca-certificates
@@ -27,46 +27,47 @@
   tags: ['install']
 
 - name: add PPA de Ondrej para PHP
-  command: add-apt-repository -y ppa:ondrej/php
-  args:
-    creates: /etc/apt/sources.list.d/ondrej-ubuntu-php*
+  ansible.builtin.apt_repository:
+    repo: ppa:ondrej/php
+    state: present
+    filename: ondrej-php
   when: ansible_distribution_release in ['noble','mantic']
   tags: ['install']
 
 - name: apt update
-  apt:
+  ansible.builtin.apt:
     update_cache: yes
   when: ansible_distribution_release in ['noble','mantic']
   tags: ['install']
 
 - name: Instalar Apache, PHP-FPM {{ php_version }}, y utilidades
-  apt:
+  ansible.builtin.apt:
     name:
       - apache2
       - libapache2-mod-fcgid
       - unzip
       - curl
       - graphviz
-      - php{{ php_version }}-fpm
-      - php{{ php_version }}-mysql
-      - php{{ php_version }}-cli
-      - php{{ php_version }}-xml
-      - php{{ php_version }}-gd
-      - php{{ php_version }}-zip
-      - php{{ php_version }}-curl
-      - php{{ php_version }}-soap
-      - php{{ php_version }}-mbstring
-      - php{{ php_version }}-apcu
-      - php{{ php_version }}-ldap
-      - php{{ php_version }}-imap
-      - php{{ php_version }}-intl
+      - "php{{ php_version }}-fpm"
+      - "php{{ php_version }}-mysql"
+      - "php{{ php_version }}-cli"
+      - "php{{ php_version }}-xml"
+      - "php{{ php_version }}-gd"
+      - "php{{ php_version }}-zip"
+      - "php{{ php_version }}-curl"
+      - "php{{ php_version }}-soap"
+      - "php{{ php_version }}-mbstring"
+      - "php{{ php_version }}-apcu"
+      - "php{{ php_version }}-ldap"
+      - "php{{ php_version }}-imap"
+      - "php{{ php_version }}-intl"
     state: present
   tags: ['install']
 
 - name: Habilitar módulos de Apache necesarios
-  command: a2enmod "{{ item }}"
-  args:
-    creates: "/etc/apache2/mods-enabled/{{ item }}.load"
+  community.general.apache2_module:
+    state: present
+    name: "{{ item }}"
   loop:
     - proxy
     - proxy_fcgi
@@ -82,9 +83,9 @@
 # ============================================
 
 - name: Ajustes PHP específicos para iTop
-  template:
+  ansible.builtin.template:
     src: php.ini.d-itop.ini.j2
-    dest: /etc/php/{{ php_version }}/fpm/conf.d/99-itop.ini
+    dest: "/etc/php/{{ php_version }}/fpm/conf.d/99-itop.ini"
     mode: "0644"
   notify: Restart PHP-FPM
   tags: ['config']
@@ -93,14 +94,8 @@
 # VERIFICACION Y PREPARACION DE DIRECTORIOS
 # ============================================
 
-- name: Verificar directorio base de iTop (itop_web_root)
-  stat:
-    path: "{{ itop_web_root }}"
-  register: install_dir
-  tags: ['install']
-
 - name: Asegurar directorio base de iTop
-  file:
+  ansible.builtin.file:
     path: "{{ itop_web_root }}"
     state: directory
     owner: www-data
@@ -108,23 +103,23 @@
     mode: "0755"
   tags: ['install']
 
-# Señal de "código presente": índice público de iTop
+# Señal de "código presente": índice público
 - name: Verificar si ya existe el árbol web de iTop
-  stat:
+  ansible.builtin.stat:
     path: "{{ itop_web_root }}/web/index.php"
   register: itop_web_present
   tags: ['install']
 
 # Señal de "setup completado": existe config-itop.php
 - name: Verificar si iTop ya está configurado (config-itop.php)
-  stat:
+  ansible.builtin.stat:
     path: "{{ itop_web_root }}/web/conf/production/config-itop.php"
   register: itop_configured
   tags: ['install']
 
 # Crear estructura para que el wizard pueda escribir config-itop.php
 - name: Crear estructura de conf/production con permisos para www-data
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: www-data
@@ -140,7 +135,7 @@
 # ============================================
 
 - name: Descargar iTop {{ itop_version }}
-  get_url:
+  ansible.builtin.get_url:
     url: "{{ itop_download_url }}"
     dest: /tmp/itop.zip
     mode: "0644"
@@ -151,10 +146,10 @@
   tags: ['install']
 
 - name: Descomprimir iTop en webroot
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/itop.zip
     dest: "{{ itop_web_root }}"
-    remote_src: yes
+    remote_src: true
     extra_opts: ["-q"]
     owner: www-data
     group: www-data
@@ -163,7 +158,7 @@
   tags: ['install']
 
 - name: Limpiar archivo zip temporal
-  file:
+  ansible.builtin.file:
     path: /tmp/itop.zip
     state: absent
   when: not itop_web_present.stat.exists
@@ -174,21 +169,22 @@
 # ============================================
 
 - name: VirtualHost para iTop (DocumentRoot -> {{ itop_web_root }}/web)
-  template:
+  ansible.builtin.template:
     src: itop-apache-vhost.conf.j2
     dest: /etc/apache2/sites-available/itop.conf
+    mode: "0644"
   notify: Restart Apache
   tags: ['config']
 
 - name: Deshabilitar sitio por defecto
-  file:
+  ansible.builtin.file:
     path: /etc/apache2/sites-enabled/000-default.conf
     state: absent
   notify: Restart Apache
   tags: ['config']
 
 - name: Habilitar sitio iTop
-  file:
+  ansible.builtin.file:
     src: /etc/apache2/sites-available/itop.conf
     dest: /etc/apache2/sites-enabled/itop.conf
     state: link
@@ -196,7 +192,7 @@
   tags: ['config']
 
 - name: Eliminar index.html que pueden tapar iTop
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
@@ -207,46 +203,58 @@
   tags: ['config']
 
 # ============================================
-# PERMISOS Y PROPIEDAD
+# PERMISOS Y PROPIEDAD (100% módulos)
 # ============================================
 
-- name: Asegurar propiedad recursiva para www-data
-  file:
+- name: Asegurar propietario www-data recursivo en árbol iTop
+  ansible.builtin.file:
     path: "{{ itop_web_root }}"
     state: directory
-    recurse: yes
+    recurse: true
     owner: www-data
     group: www-data
     mode: "0755"
   notify: Fix permissions
   tags: ['config', 'permissions']
 
-- name: Asegurar permisos recursivos (dirs 755, files 644)
-  shell: |
-    find {{ itop_web_root }} -type d -exec chmod 755 {} +;
-    find {{ itop_web_root }} -type f -exec chmod 644 {} +;
-  args:
-    warn: false
+- name: Encontrar directorios bajo itop_web_root
+  ansible.builtin.find:
+    paths: "{{ itop_web_root }}"
+    file_type: directory
+  register: itop_dirs
   tags: ['permissions']
 
-- name: Crear directorios de datos con permisos especiales
-  file:
-    path: "{{ itop_web_root }}/{{ item }}"
-    state: directory
-    owner: www-data
-    group: www-data
-    mode: "0770"
-  loop:
-    - data
-    - log
-    - env-production
-    - conf
-  ignore_errors: yes
-  tags: ['config', 'permissions']
+- name: Permisos 0755 en directorios
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "0755"
+  loop: "{{ itop_dirs.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  tags: ['permissions']
 
-# Marker para señales externas (initialize-itop.sh / monitoreo)
+- name: Encontrar archivos bajo itop_web_root
+  ansible.builtin.find:
+    paths: "{{ itop_web_root }}"
+    file_type: file
+  register: itop_files
+  tags: ['permissions']
+
+- name: Permisos 0644 en archivos
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "0644"
+  loop: "{{ itop_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  tags: ['permissions']
+
+# ============================================
+# MARKER PARA PROVISION / MONITOREO
+# ============================================
+
 - name: Crear marker de provisión en EFS
-  copy:
+  ansible.builtin.copy:
     dest: "{{ itop_web_root }}/.itop_provisioned"
     content: "provisioned at {{ ansible_date_time.iso8601 }}"
     owner: www-data
@@ -260,12 +268,12 @@
 # ============================================
 
 - name: Iniciar y habilitar servicios
-  service:
+  ansible.builtin.service:
     name: "{{ item }}"
     state: started
     enabled: yes
   loop:
-    - php{{ php_version }}-fpm
+    - "php{{ php_version }}-fpm"
     - apache2
   tags: ['service']
 
@@ -274,7 +282,7 @@
 # ============================================
 
 - name: Mostrar información de acceso
-  debug:
+  ansible.builtin.debug:
     msg: >-
       {{
         [
