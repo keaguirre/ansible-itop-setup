@@ -58,7 +58,7 @@ pipx ensurepath
    o
    ```bash
    sudo ansible-pull \
-     -U https://github.com/keaguirre/ansible-test-itop.git \
+     -U https://github.com/keaguirre/ansible-itop-setup \
      -C main \
      -d /etc/ansible-itop \
      -i /etc/ansible-itop/inventory.ini \
