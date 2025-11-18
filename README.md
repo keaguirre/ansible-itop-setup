@@ -62,7 +62,7 @@ pipx ensurepath
      -C main \
      -d /etc/ansible-itop \
      -i /etc/ansible-itop/inventory.ini \
-     /etc/ansible-itop/site.yml
+     /etc/ansible-itop/site.yaml
 
    ```
    
